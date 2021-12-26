@@ -1,12 +1,5 @@
 var mongoose = require('mongoose');
-mongoose.connect('mongodb+srv://temp:temp@cluster0.kszbk.mongodb.net/myFirstDatabase?retryWrites=true&w=majority',
-    {
-        useNewUrlParser: true,
-        // useFindAndModify: false,
-        // useCreateIndex: true,
-        // useUnifiedTopology: true,
-    }
-);
+mongoose.connect(process.env.MONGO, { useNewUrlParser: true, });
 var conn = mongoose.connection;
 conn.on('connected', function () {
     console.log('database is connected successfully');

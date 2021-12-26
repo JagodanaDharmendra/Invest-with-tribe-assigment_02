@@ -1,3 +1,4 @@
+require('dotenv').config();
 require("./database");
 const createError = require('http-errors');
 const express = require('express');
@@ -6,6 +7,9 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const bodyParser = require('body-parser');
+
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const passport = require("passport");
 const LocalStrategy = require('passport-local').Strategy;
@@ -75,6 +79,23 @@ app.post("/register", function (req, res) {
       return res.render("register");
     }
     passport.authenticate("local")(req, res, function () {
+      const msg = {
+        to: username, // Change to your recipient
+        from: process.env.FROM_MAIL, // Change to your verified sender
+        subject: 'Welcome buddy',
+        text: 'Welcome to test app',
+        html: '<strong>Welcome to test app using Node, Express and Mongoose</strong>',
+      }
+
+      sgMail
+        .send(msg)
+        .then((response) => {
+          console.log(response)
+        })
+        .catch((error) => {
+          console.error(error)
+        })
+
       res.render("home");
     });
   });
@@ -153,3 +174,6 @@ app.use(function (err, req, res, next) {
 });
 
 module.exports = app;
+
+
+

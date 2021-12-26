@@ -1,15 +1,20 @@
-var createError = require('http-errors');
-var express = require('express');
-var cors = require('cors');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
+require("./database");
+const createError = require('http-errors');
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
+const bodyParser = require('body-parser');
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var bankHolidaysRouter = require('./routes/bank-holidays');
+const passport = require("passport");
+const LocalStrategy = require('passport-local').Strategy;
+const User = require("./models/user");
 
-var app = express();
+const bankHolidaysRouter = require('./routes/bank-holidays');
+
+const app = express();
+
 app.use(cors({
   origin: '*'
 }));
@@ -19,19 +24,122 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
 app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', indexRouter);
-app.use('/users', usersRouter);
+app.use(require("express-session")({
+  secret: "Login is dummy",
+  resave: false,
+  saveUninitialized: false
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.use(new LocalStrategy({ usernameField: 'username' }, User.authenticate()));
+// passport.use(new LocalStrategy(User.authenticate()));
+// passport.use(User.createStrategy());
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+
+//=====================
+// ROUTES
+//=====================
+
+// Showing register page
+app.get("/", function (req, res) {
+  res.render('register', {
+    title: 'Registration Page',
+    name: '',
+    username: '',
+    password: ''
+  })
+});
+
+// Showing home page
+app.get("/home", isLoggedIn, function (req, res) {
+  res.render("home");
+});
+
+// Handling user signup
+app.post("/register", function (req, res) {
+  const username = req.body.username;
+  const password = req.body.password;
+  const name = req.body.name;
+  User.register(new User({ username: username, password: password, name: name }), password, function (err, user) {
+    if (err) {
+      console.log(err);
+      return res.render("register");
+    }
+    passport.authenticate("local")(req, res, function () {
+      res.render("home");
+    });
+  });
+});
+
+//Showing login form
+app.get("/login", function (req, res) {
+  if (req.isAuthenticated()) {
+    res.redirect("home");
+  } else {
+    res.render('login', {
+      title: 'Login',
+      username: '',
+      password: ''
+    })
+  }
+});
+
+//Handling user login
+app.post('/login', (req, res, next) => {
+  passport.authenticate('local',
+    (err, user, info) => {
+      console.log(err);
+      console.log(user);
+      console.log(info);
+      if (err) {
+        return next(err);
+      }
+
+      if (!user) {
+        return res.redirect('/login');
+      }
+
+      req.logIn(user, function (err) {
+        if (err) {
+          return next(err);
+        }
+        return res.redirect('/home');
+      });
+
+    })(req, res, next);
+});
+
+// //Handling user login
+// app.post("/login", passport.authenticate("local", {
+//   successRedirect: "/home",
+//   failureRedirect: "/login"
+// }), function (req, res) {
+// });
+
+//Handling user logout
+app.get("/logout", function (req, res) {
+  req.logout();
+  res.redirect("/");
+});
+
 app.use('/bank-holidays', bankHolidaysRouter);
 
-// catch 404 and forward to error handler
-app.use(function (req, res, next) {
-  next(createError(404));
-});
+function isLoggedIn(req, res, next) {
+  console.log(req);
+  if (req.isAuthenticated()) {
+    return next();
+  }
+  return res.redirect("/login");
+}
 
 // error handler
 app.use(function (err, req, res, next) {
